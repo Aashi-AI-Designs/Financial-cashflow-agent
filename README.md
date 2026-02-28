@@ -111,7 +111,7 @@ bash# 1. Clone the repository
 git clone https://github.com/YOUR_USERNAME/financial-cashflow-agent.git
 cd financial-cashflow-agent
 
-# 2. Create and activate virtual environment
+# 2. Create and activate a virtual environment
 python -m venv venv
 venv\Scripts\activate        # Windows
 # source venv/bin/activate   # Mac/Linux
