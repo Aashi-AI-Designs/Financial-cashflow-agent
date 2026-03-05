@@ -1,0 +1,17 @@
+[flake8]
+max-line-length = 88
+exclude =
+    venv,
+    .git,
+    __pycache__,
+    build,
+    dist
+
+# Ignore rules that conflict with Black's formatting
+# E203: whitespace before ':' (Black handles this)
+# W503: line break before binary operator (Black handles this)
+ignore = E203, W503
+
+# Show the error code next to each violation so you know what to look up
+show-source = True
+show-pep8 = True

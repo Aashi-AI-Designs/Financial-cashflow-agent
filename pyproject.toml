@@ -1,0 +1,52 @@
+[project]
+name = "financial-cashflow-agent"
+version = "0.1.0"
+description = "A flexible SQL + RAG hybrid AI agent for forecasting cash runway and financial health for any type of small business."
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "MIT" }
+
+# ------------------------------------------------------------------------------
+# Black — code formatter
+# ------------------------------------------------------------------------------
+# Black enforces a consistent code style automatically.
+# You never argue about spacing or formatting again.
+# Run: black .
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    venv
+  | \.git
+  | __pycache__
+  | build
+  | dist
+)/
+'''
+
+# ------------------------------------------------------------------------------
+# Flake8 — linter
+# This section is read by setup.cfg or .flake8 — pyproject.toml support
+# for flake8 is limited, so we configure it inline as a comment reference.
+# Create a .flake8 file in the root (see below).
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# Pytest — test runner
+# ------------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+# Show extra test summary info: (f)ailed, (e)rror, (s)kipped
+addopts = "-v --tb=short"
+
+# ------------------------------------------------------------------------------
+# isort — import sorter (works alongside Black)
+# ------------------------------------------------------------------------------
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = ["config", "database", "ingest", "tools", "agent", "reports", "eval"]
