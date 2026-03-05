@@ -154,11 +154,11 @@ def seed_green_plate_cafe(conn) -> int:
              quantity_in_stock, reorder_threshold, monthly_usage_avg)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, [
-        (bid, 'Coffee Beans (1kg)',  'Beverages',   18.00, None, 45,  10, 40),
-        (bid, 'Oat Milk (1L)',       'Beverages',    1.80, None, 120, 30, 110),
-        (bid, 'Avocado (each)',      'Produce',      1.20, None, 80,  20, 75),
-        (bid, 'Sourdough Loaf',      'Bakery',       3.50, None, 30,  10, 28),
-        (bid, 'Mixed Salad Greens',  'Produce',      4.00, None, 15,   5, 14),
+        (bid, 'Coffee Beans (1kg)',  'Beverages',   18.00, 0, 45,  10, 40),
+        (bid, 'Oat Milk (1L)',       'Beverages',    1.80, 0, 120, 30, 110),
+        (bid, 'Avocado (each)',      'Produce',      1.20, 0, 80,  20, 75),
+        (bid, 'Sourdough Loaf',      'Bakery',       3.50, 0, 30,  10, 28),
+        (bid, 'Mixed Salad Greens',  'Produce',      4.00, 0, 15,   5, 14),
     ])
 
     return bid, transactions
