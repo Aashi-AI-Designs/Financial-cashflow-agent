@@ -70,11 +70,48 @@ def main() -> None:
     logger.info("All data directories confirmed")
 
     # -------------------------------------------------------------------------
-    # Module 1 complete — environment is ready
-    # Subsequent modules will add their initialisation here
+    # Module 2: Initialise the database
+    # Creates all tables if they don't exist yet (safe to call every startup)
     # -------------------------------------------------------------------------
-    logger.info("Environment ready. Modules 2-7 will be wired in as we build them.")
-    print("\n✅ Module 1 complete — your environment is set up correctly.\n")
+    from database.db import initialise_database, get_row_counts
+
+    initialise_database()
+
+    counts = get_row_counts()
+    total_rows = sum(counts.values())
+
+    if total_rows == 0:
+        logger.warning("Database is empty. Run: python database/seed_db.py")
+    else:
+        logger.info(
+            "Database ready — %d rows across %d tables",
+            total_rows, len([t for t, c in counts.items() if c > 0])
+        )
+
+    # -------------------------------------------------------------------------
+    # Module 3: Load the vector store
+    # -------------------------------------------------------------------------
+    from ingest.vector_store import get_vector_store, VectorStore
+    from pathlib import Path
+
+    index_file = settings.VECTOR_STORE_ABSOLUTE_PATH / "index.faiss"
+    if not index_file.exists():
+        logger.warning(
+            "Vector store not found. Run: python ingest/ingest_docs.py"
+        )
+    else:
+        store = get_vector_store()
+        stats = store.stats()
+        logger.info(
+            "Vector store ready — %d chunks, types: %s",
+            stats["total_chunks"], ", ".join(stats["business_types"])
+        )
+
+    # -------------------------------------------------------------------------
+    # Modules 4-7 will be wired in as we build them
+    # -------------------------------------------------------------------------
+    logger.info("Environment ready.")
+    print("\n Environment ready.\n")
 
 
 if __name__ == "__main__":
