@@ -11,8 +11,7 @@ Why chunking matters:
 
 Chunking strategies implemented:
 1. FixedSizeChunker   — simple, splits by character count with overlap
-2. SentenceChunker    — splits on sentence boundaries, more natural
-3. SectionChunker     — splits on headers/sections, best for structured docs
+2. SectionChunker     — splits on paragraph boundaries with header detection
 
 For this project we use SectionChunker as our documents have clear headers.
 FixedSizeChunker is kept for reference and comparison.
@@ -35,11 +34,11 @@ class Chunk:
     it knows exactly where it came from — which document, which section,
     which business type. This is how the agent cites its sources.
     """
-    text: str                          # The actual text content
-    source_file: str                   # Relative path of the source document
-    business_type: str                 # 'general', 'restaurant', 'saas', etc.
-    section: str = ""                  # Section heading if available
-    chunk_index: int = 0               # Position within the document
+    text: str
+    source_file: str
+    business_type: str
+    section: str = ""
+    chunk_index: int = 0
     metadata: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -47,22 +46,12 @@ class Chunk:
 
     @property
     def is_empty(self) -> bool:
-        return len(self.text.strip()) < 50  # Ignore tiny fragments
+        return len(self.text.strip()) < 50
 
 
 class FixedSizeChunker:
     """
     Splits text into fixed-size chunks with overlap.
-
-    Simple and reliable. The overlap ensures that a concept split
-    across a chunk boundary appears in both chunks, so retrieval
-    doesn't miss it.
-
-    Overlap example with chunk_size=100, overlap=20:
-        Chunk 1: characters 0-100
-        Chunk 2: characters 80-180   ← 20 chars overlap with chunk 1
-        Chunk 3: characters 160-260  ← 20 chars overlap with chunk 2
-
     When to use: unstructured text without clear section boundaries.
     """
 
@@ -75,7 +64,6 @@ class FixedSizeChunker:
         self.chunk_overlap = chunk_overlap
 
     def chunk(self, text: str, source_file: str, business_type: str) -> list[Chunk]:
-        """Split text into fixed-size overlapping chunks."""
         chunks = []
         start = 0
         index = 0
@@ -83,44 +71,31 @@ class FixedSizeChunker:
         while start < len(text):
             end = start + self.chunk_size
             chunk_text = text[start:end]
-
             chunk = Chunk(
                 text=chunk_text,
                 source_file=source_file,
                 business_type=business_type,
                 chunk_index=index,
             )
-
             if not chunk.is_empty:
                 chunks.append(chunk)
-
-            # Move forward by (chunk_size - overlap) to create the overlap
             start += self.chunk_size - self.chunk_overlap
             index += 1
 
-        logger.debug(
-            "FixedSizeChunker: %d chunks from %s", len(chunks), source_file
-        )
+        logger.debug("FixedSizeChunker: %d chunks from %s", len(chunks), source_file)
         return chunks
 
 
 class SectionChunker:
     """
-    Splits text on section headers (ALL CAPS lines or lines ending with newlines).
+    Splits text on paragraph boundaries, grouping paragraphs under
+    detected section headers.
 
-    This is the right chunker for our documents because they are structured
-    with clear section titles. Each section becomes its own chunk (or is
-    split further if it exceeds max_chunk_size).
+    Works by splitting on double newlines (paragraphs), then checking
+    if each paragraph is a header or content. Headers are short lines
+    that don't end in sentence-ending punctuation.
 
-    Why section-based chunking is better for our use case:
-    - "What is burn rate?" retrieves the burn rate section, not a random
-      character window that might include half of two different sections
-    - Sections are semantically coherent — all content in a chunk is
-      about the same topic
-    - Source attribution is cleaner — the agent can say "according to
-      the SaaS Metrics Guide, section on Churn Rate..."
-
-    When to use: structured documents with clear headers.
+    When to use: structured documents with clear section headers.
     """
 
     def __init__(self, max_chunk_size: int = 2000, min_chunk_size: int = 100):
@@ -128,28 +103,34 @@ class SectionChunker:
         self.min_chunk_size = min_chunk_size
 
     def _is_header(self, line: str) -> bool:
-        """Detect section headers — ALL CAPS lines of reasonable length."""
+        """Detect section headers."""
         stripped = line.strip()
-        if not stripped:
+        if not stripped or len(stripped) < 5 or len(stripped) > 120:
             return False
-        # A header: mostly uppercase, not too short, not too long
-        if len(stripped) < 5 or len(stripped) > 120:
+        # Too many words to be a header
+        words = stripped.split()
+        if len(words) > 12:
             return False
-        # At least 60% uppercase (allows for numbers and punctuation)
+        # Sentence-ending punctuation means it's content, not a header
+        if stripped[-1] in '.,;:':
+            return False
         alpha_chars = [c for c in stripped if c.isalpha()]
         if not alpha_chars:
             return False
+        # ALL CAPS header
         upper_ratio = sum(1 for c in alpha_chars if c.isupper()) / len(alpha_chars)
-        return upper_ratio > 0.6
+        if upper_ratio > 0.6:
+            return True
+        # Title Case header — majority of words start with uppercase
+        if words[0][0].isupper() and sum(1 for w in words if w[0].isupper()) >= len(words) * 0.6:
+            return True
+        return False
 
     def _split_large_section(
         self, text: str, source_file: str, business_type: str,
         section: str, start_index: int
     ) -> list[Chunk]:
-        """
-        If a section exceeds max_chunk_size, split it into paragraph-sized chunks.
-        Preserves the section name in each sub-chunk's metadata.
-        """
+        """Split an oversized section into paragraph-sized sub-chunks."""
         chunks = []
         paragraphs = re.split(r'\n\n+', text)
         current_text = ""
@@ -159,7 +140,6 @@ class SectionChunker:
             para = para.strip()
             if not para:
                 continue
-
             if len(current_text) + len(para) > self.max_chunk_size and current_text:
                 chunk = Chunk(
                     text=current_text.strip(),
@@ -175,7 +155,6 @@ class SectionChunker:
             else:
                 current_text += "\n\n" + para if current_text else para
 
-        # Don't forget the last piece
         if current_text.strip():
             chunk = Chunk(
                 text=current_text.strip(),
@@ -190,88 +169,80 @@ class SectionChunker:
         return chunks
 
     def chunk(self, text: str, source_file: str, business_type: str) -> list[Chunk]:
-        """Split text into section-based chunks."""
-        lines = text.split('\n')
+        """Split text into paragraph-based chunks grouped under section headers."""
+        paragraphs = re.split(r'\n\n+', text)
         chunks = []
         current_section = "Introduction"
-        current_lines = []
+        current_text = ""
         chunk_index = 0
 
-        for line in lines:
-            if self._is_header(line):
-                # Save the accumulated section before starting the new one
-                if current_lines:
-                    section_text = '\n'.join(current_lines).strip()
-                    if len(section_text) >= self.min_chunk_size:
-                        if len(section_text) > self.max_chunk_size:
-                            # Section too large — split into paragraphs
-                            sub_chunks = self._split_large_section(
-                                section_text, source_file, business_type,
-                                current_section, chunk_index
-                            )
-                            chunks.extend(sub_chunks)
-                            chunk_index += len(sub_chunks)
-                        else:
-                            chunk = Chunk(
-                                text=section_text,
-                                source_file=source_file,
-                                business_type=business_type,
-                                section=current_section,
-                                chunk_index=chunk_index,
-                            )
-                            if not chunk.is_empty:
-                                chunks.append(chunk)
-                                chunk_index += 1
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
 
-                # Start the new section
-                current_section = line.strip()
-                current_lines = []
+            lines = para.splitlines()
+            # A header paragraph: short, 1-2 lines, all lines look like headers
+            is_header_para = (
+                len(lines) <= 2
+                and all(self._is_header(l) for l in lines if l.strip())
+            )
+
+            if is_header_para:
+                # Save accumulated content as a chunk before starting new section
+                if current_text.strip() and len(current_text.strip()) >= self.min_chunk_size:
+                    if len(current_text) > self.max_chunk_size:
+                        sub_chunks = self._split_large_section(
+                            current_text, source_file, business_type,
+                            current_section, chunk_index
+                        )
+                        chunks.extend(sub_chunks)
+                        chunk_index += len(sub_chunks)
+                    else:
+                        chunk = Chunk(
+                            text=current_text.strip(),
+                            source_file=source_file,
+                            business_type=business_type,
+                            section=current_section,
+                            chunk_index=chunk_index,
+                        )
+                        if not chunk.is_empty:
+                            chunks.append(chunk)
+                            chunk_index += 1
+                current_section = para.strip()
+                current_text = ""
             else:
-                current_lines.append(line)
+                current_text += "\n\n" + para if current_text else para
 
-        # Handle the final section
-        if current_lines:
-            section_text = '\n'.join(current_lines).strip()
-            if len(section_text) >= self.min_chunk_size:
-                chunk = Chunk(
-                    text=section_text,
-                    source_file=source_file,
-                    business_type=business_type,
-                    section=current_section,
-                    chunk_index=chunk_index,
-                )
-                if not chunk.is_empty:
-                    chunks.append(chunk)
+        # Final chunk
+        if current_text.strip() and len(current_text.strip()) >= self.min_chunk_size:
+            chunk = Chunk(
+                text=current_text.strip(),
+                source_file=source_file,
+                business_type=business_type,
+                section=current_section,
+                chunk_index=chunk_index,
+            )
+            if not chunk.is_empty:
+                chunks.append(chunk)
 
-        logger.debug(
-            "SectionChunker: %d chunks from %s", len(chunks), source_file
-        )
+        logger.debug("SectionChunker: %d chunks from %s", len(chunks), source_file)
         return chunks
 
 
 def chunk_file(
     file_path: Path,
     pdf_base_dir: Path,
-    chunker: SectionChunker | FixedSizeChunker | None = None
+    chunker=None
 ) -> list[Chunk]:
     """
     Chunk a single file.
-
-    Automatically determines the business_type from the folder structure:
-        data/pdfs/restaurant/food_cost_management.txt → business_type = 'restaurant'
-        data/pdfs/general/cash_flow_fundamentals.txt  → business_type = 'general'
-
-    Args:
-        file_path: Absolute path to the text file
-        pdf_base_dir: The data/pdfs/ directory (used to compute relative path)
-        chunker: Chunker instance to use (defaults to SectionChunker)
+    Automatically determines business_type from folder structure.
     """
     if chunker is None:
         chunker = SectionChunker()
 
     text = file_path.read_text(encoding="utf-8")
-
-    # Derive business_type from folder name
     relative = file_path.relative_to(pdf_base_dir)
     parts = relative.parts
     business_type = parts[0] if len(parts) > 1 else "general"

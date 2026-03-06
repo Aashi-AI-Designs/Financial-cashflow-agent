@@ -1,0 +1,31 @@
+{
+  "total_chunks": 61,
+  "dimension": 384,
+  "business_types": [
+    "freelance",
+    "funded_startup",
+    "general",
+    "restaurant",
+    "retail",
+    "saas"
+  ],
+  "source_files": [
+    "freelance\\freelance_cash_flow_guide.txt",
+    "funded_startup\\startup_runway_guide.txt",
+    "general\\cash_flow_fundamentals.txt",
+    "general\\financial_health_benchmarks.txt",
+    "general\\runway_planning_guide.txt",
+    "restaurant\\food_cost_management.txt",
+    "restaurant\\restaurant_financial_guide.txt",
+    "retail\\retail_cash_flow_guide.txt",
+    "saas\\saas_metrics_guide.txt"
+  ],
+  "chunks_per_business_type": {
+    "restaurant": 12,
+    "funded_startup": 6,
+    "retail": 8,
+    "freelance": 7,
+    "general": 21,
+    "saas": 7
+  }
+}

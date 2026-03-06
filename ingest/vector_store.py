@@ -63,7 +63,7 @@ class VectorStore:
 
         self.index: Optional[faiss.IndexFlatL2] = None
         self.chunks: list[Chunk] = []  # Parallel list to the FAISS index
-        self.dimension: int = 1536     # text-embedding-3-small dimension
+        self.dimension: int = 384      # all-MiniLM-L6-v2 dimension
 
     # -------------------------------------------------------------------------
     # Building the index

@@ -437,7 +437,7 @@ def create_documents() -> None:
     print(f"  {created} documents written to {pdf_dir}")
     for path in sorted(pdf_dir.rglob("*.txt")):
         size = path.stat().st_size
-        print(f"  {path.relative_to(pdf_dir):<55} {size:>6} bytes")
+        print(f"  {str(path.relative_to(pdf_dir)):<55} {size:>6} bytes")
     print("=" * 30)
     print("\n✅ Documents ready for embedding.\n")
 
