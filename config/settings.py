@@ -30,7 +30,7 @@ class Settings:
     """
 
     # -------------------------------------------------------------------------
-    # OpenAI
+    # OpenAI & Groq
     # -------------------------------------------------------------------------
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_EMBEDDING_MODEL: str = os.getenv(
@@ -40,6 +40,10 @@ class Settings:
 
     # Max tokens the LLM is allowed to generate per response
     OPENAI_MAX_TOKENS: int = int(os.getenv("OPENAI_MAX_TOKENS", "2048"))
+
+    # Groq
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
     # -------------------------------------------------------------------------
     # Database
@@ -102,10 +106,8 @@ class Settings:
         """
         errors = []
 
-        if not self.OPENAI_API_KEY:
-            errors.append(
-                "OPENAI_API_KEY is not set. Add it to your .env file."
-            )
+        if not self.GROQ_API_KEY:
+            errors.append("GROQ_API_KEY is not set. Add it to your .env file.")
 
         if self.CHUNK_OVERLAP >= self.CHUNK_SIZE:
             errors.append(
